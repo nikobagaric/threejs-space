@@ -1,0 +1,87 @@
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+* {
+  margin: 0;
+}
+body {
+  line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  -webkit-font-smoothing: antialiased;
+}
+img, picture, video, canvas, svg {
+  display: block;
+  max-width: 100%;
+}
+input, button, textarea, select {
+  font: inherit;
+}
+p, h1, h2, h3, h4, h5, h6 {
+  overflow-wrap: break-word;
+}
+li {
+  list-style-type: none;
+}
+a {
+  color: inherit;
+  text-decoration: none;
+}
+#root, #__next {
+  isolation: isolate;
+}
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+
+  color-scheme: light dark;
+  color: rgba(255, 255, 255, 0.87);
+  background: #000;
+
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* end of reset */
+
+header {
+  display: flex;
+  position: sticky;
+  top: 0;
+  width: 100%;
+  height: 50px;
+  margin-bottom: -50px;
+  background: none;
+  justify-content: space-evenly;
+}
+article > canvas {
+  width: 100%;
+}
+h1 {
+  cursor: default;
+}
+#hero-card {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: #ffffff3f;
+  padding: 0px;
+  top: 8%;
+  left: 5%;
+  width: 0px;
+  height: 0px;
+  font-size: 0;
+  border-radius: 20px;
+  transition: ease-in-out 0.2s;
+}
+
+#hero-card.active-card {
+  padding: 10px;
+  font-size: 2em;
+  width: 25vw;
+  height: 83vh;
+} 
