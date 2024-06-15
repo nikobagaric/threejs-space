@@ -1,15 +1,10 @@
 import * as THREE from "three";
-import {
-  GLTFLoader,
-  TextureHelper,
-  ThreeMFLoader,
-} from "three/examples/jsm/Addons.js";
-import { OrbitControls } from "three/examples/jsm/Addons.js";
-
-import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
-import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
-import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js';
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { BokehPass } from "three/examples/jsm/postprocessing/BokehPass.js";
 
 // ** SETUP ** \\
 
@@ -42,21 +37,42 @@ function onWindowResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
+const manager = new THREE.LoadingManager();
+
+manager.onStart = function (url, itemsLoaded, itemsTotal) {
+    console.log('Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
+};
+
+manager.onLoad = function ( ) {
+    console.log('Loading complete!');
+    document.getElementById('loadingScreen').style.display = 'none'; // Hide loading screen when loading complete
+};
+
+manager.onProgress = function (url, itemsLoaded, itemsTotal) {
+    console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
+    let progress = (itemsLoaded / itemsTotal * 100);
+    document.getElementById('loader').style.width = progress + '%'; // Update loading bar width
+};
+
+manager.onError = function (url) {
+    console.log('There was an error loading ' + url);
+};
+
+
 // ** LIGHTING ** \\
 
 const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
 scene.add(ambientLight);
 
 const hemisphereLight = new THREE.HemisphereLight(0x8812ff, 0x881288, 4);
-hemisphereLight.position.set(0,10,0);
+hemisphereLight.position.set(0, 10, 0);
 scene.add(hemisphereLight);
 
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
 
-
-const loader = new GLTFLoader();
-const textureLoader = new THREE.TextureLoader();
+const loader = new GLTFLoader(manager);
+const textureLoader = new THREE.TextureLoader(manager);
 
 // earth
 let earth = null;
@@ -68,9 +84,9 @@ loader.load(
     earth = gltf.scene;
     earth.traverse(function (object) {
       if (object.name.includes("9")) earthClouds = object;
-      if (object.isMesh){ 
-        console.log(object.name)
-      };
+      if (object.isMesh) {
+        console.log(object.name);
+      }
     });
     scene.add(earth);
   },
@@ -114,7 +130,7 @@ function createStars(count, size) {
     y /= length;
     z /= length;
 
-    const distance = 100 + Math.random() * 1900; 
+    const distance = 100 + Math.random() * 1900;
     x *= distance;
     y *= distance;
     z *= distance;
@@ -154,9 +170,9 @@ let zoomTarget = new THREE.Vector3();
 const raycaster = new THREE.Raycaster();
 const mouse = new THREE.Vector2();
 
-function switchCardText(currentPlanet){
-  switch(currentPlanet.name){
-    case 'Object_9':
+function switchCardText(currentPlanet) {
+  switch (currentPlanet.name) {
+    case "Object_9":
       heroCardH.textContent = "Earth";
       heroCardP.textContent = "Lorem ipsum dolor sit amet consectetur it";
       break;
@@ -165,7 +181,7 @@ function switchCardText(currentPlanet){
       heroCardP.textContent = "Lorem ipsum dolor sit amet consectetur it";
       break;
     default:
-      console.log(currentPlanet.name)
+      console.log(currentPlanet.name);
       heroCardH.textContent = "Lorddem ipsum";
       heroCardP.textContent = "Lorem ipsum dolor sit amet consectetur it";
       break;
@@ -209,18 +225,22 @@ window.addEventListener(
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
-const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.25, 1, 0.76);
+const bloomPass = new UnrealBloomPass(
+  new THREE.Vector2(window.innerWidth, window.innerHeight),
+  1.25,
+  1,
+  0.76
+);
 composer.addPass(bloomPass);
 
 const bokehPass = new BokehPass(scene, camera, {
-    focus: 1.0,
-    aperture: 0.0005,
-    maxblur: 0.01,
-    width: window.innerWidth,
-    height: window.innerHeight
+  focus: 1.0,
+  aperture: 0.0005,
+  maxblur: 0.01,
+  width: window.innerWidth,
+  height: window.innerHeight,
 });
 composer.addPass(bokehPass);
-
 
 // ANIMATE \\
 
