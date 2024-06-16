@@ -35,29 +35,46 @@ function onWindowResize() {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  bokehPass.width = window.innerWidth;
+  bokehPass.height = window.innerHeight;
 }
 
 const manager = new THREE.LoadingManager();
 
 manager.onStart = function (url, itemsLoaded, itemsTotal) {
-    console.log('Started loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
+  console.log(
+    "Started loading file: " +
+      url +
+      ".\nLoaded " +
+      itemsLoaded +
+      " of " +
+      itemsTotal +
+      " files."
+  );
 };
 
-manager.onLoad = function ( ) {
-    console.log('Loading complete!');
-    document.getElementById('loadingScreen').style.display = 'none'; // Hide loading screen when loading complete
+manager.onLoad = function () {
+  console.log("Loading complete!");
+  document.getElementById("loadingScreen").style.display = "none"; // Hide loading screen when loading complete
 };
 
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
-    console.log('Loading file: ' + url + '.\nLoaded ' + itemsLoaded + ' of ' + itemsTotal + ' files.');
-    let progress = (itemsLoaded / itemsTotal * 100);
-    document.getElementById('loader').style.width = progress + '%'; // Update loading bar width
+  console.log(
+    "Loading file: " +
+      url +
+      ".\nLoaded " +
+      itemsLoaded +
+      " of " +
+      itemsTotal +
+      " files."
+  );
+  let progress = (itemsLoaded / itemsTotal) * 100;
+  document.getElementById("loader").style.width = progress * 0.1 + "%"; // Update loading bar width
 };
 
 manager.onError = function (url) {
-    console.log('There was an error loading ' + url);
+  console.log("There was an error loading " + url);
 };
-
 
 // ** LIGHTING ** \\
 
@@ -84,9 +101,6 @@ loader.load(
     earth = gltf.scene;
     earth.traverse(function (object) {
       if (object.name.includes("9")) earthClouds = object;
-      if (object.isMesh) {
-        console.log(object.name);
-      }
     });
     scene.add(earth);
   },
@@ -112,9 +126,36 @@ const moon = new THREE.Mesh(
     shininess: 0.5,
   })
 );
+moon.name = "Moon";
 moon.position.set(moonOrbitRadius, 0, 0);
 
 scene.add(moon);
+
+// sun
+const sunPosition = new THREE.Vector3(moonOrbitRadius * 11, 0, 0);
+
+function emissiveUpdate() {
+  const distance = camera.position.distanceTo(sunPosition);
+  const maxDistance = moonOrbitRadius * 11;
+  let intensityFactor = distance / maxDistance + 0.4;
+  intensityFactor = Math.min(1, intensityFactor);
+  sunMaterial.emissiveIntensity = intensityFactor;
+}
+
+const sunTexture = textureLoader.load("/img/SunTexture.jpg");
+let sunMaterial = new THREE.MeshPhongMaterial({
+  map: sunTexture,
+  emissive: 0xffff55,
+  emissiveIntensity: 0.8,
+  shininess: 0.6,
+});
+
+const sun = new THREE.Mesh(new THREE.SphereGeometry(2), sunMaterial);
+sun.name = "Sun";
+sun.position.set(moonOrbitRadius * 11, 0, 0);
+sun.castShadow = true;
+
+scene.add(sun);
 
 // stars
 function createStars(count, size) {
@@ -130,7 +171,7 @@ function createStars(count, size) {
     y /= length;
     z /= length;
 
-    const distance = 100 + Math.random() * 1900;
+    const distance = 150 + Math.random() * 1900;
     x *= distance;
     y *= distance;
     z *= distance;
@@ -180,13 +221,18 @@ function switchCardText(currentPlanet) {
       heroCardH.textContent = "Moon";
       heroCardP.textContent = "Lorem ipsum dolor sit amet consectetur it";
       break;
+    case sun.name:
+      heroCardH.textContent = "Sun";
+      heroCardP.textContent = "Lorem ipsum dolor sit amet consectetur it";
+      break;
     default:
-      console.log(currentPlanet.name);
-      heroCardH.textContent = "Lorddem ipsum";
+      heroCardH.textContent = "Lorem ipsum";
       heroCardP.textContent = "Lorem ipsum dolor sit amet consectetur it";
       break;
   }
 }
+
+let earthCoords = {latitude: 0, longitude: 0};
 
 window.addEventListener(
   "click",
@@ -196,22 +242,32 @@ window.addEventListener(
 
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(
-      [earth, earthClouds, moon].filter((obj) => obj !== null),
+      [earth, moon, sun].filter(obj => obj !== null),
       true
     );
 
     if (intersects.length > 0 && targetObject != intersects[0].object) {
       let intersectionPoint = intersects[0].point;
-      let direction = intersectionPoint
-        .clone()
-        .sub(camera.position)
-        .normalize();
-      targetZoomPosition = intersectionPoint.sub(direction); // Move back 1 unit from the intersection point
+      let direction = intersectionPoint.clone().sub(camera.position).normalize();
       targetObject = intersects[0].object;
+
+      let radius = targetObject.geometry.boundingSphere.radius;
+      targetZoomPosition = intersectionPoint.sub(direction.multiplyScalar(radius + 1)); // Move back by radius + 1 unit from the intersection point
+
       isZooming = true;
-      console.log(targetObject);
       switchCardText(targetObject);
       heroCard.classList.add("active-card");
+
+      if (targetObject.name === "Object_9") {
+        let normalizedY = intersectionPoint.y / radius;
+        normalizedY = Math.max(-1, Math.min(1, normalizedY)); // Ensure it stays within [-1, 1]
+
+        let latitude = 90 - (Math.acos(normalizedY) * 180 / Math.PI);  // φ
+        let longitude = (Math.atan2(intersectionPoint.z, intersectionPoint.x) * 180 / Math.PI); // λ
+        console.log("Latitude:", latitude, "Longitude:", longitude);
+      }
+      console.log("Intersection Point:", intersectionPoint);
+
     } else if (intersects.length == 0 && targetObject != null) {
       targetObject = null;
       isZooming = false;
@@ -220,6 +276,7 @@ window.addEventListener(
   },
   false
 );
+
 
 // fx
 const composer = new EffectComposer(renderer);
@@ -258,6 +315,9 @@ function animate() {
   if (moon) {
     moon.rotateOnAxis(new THREE.Vector3(0.7, 0.25, -1), 0.0026);
   }
+  if (sun) {
+    sun.rotateOnAxis(new THREE.Vector3(0, 1, 0), 0.005);
+  }
 
   // MOON ORBIT
   moonOrbitAngle += moonOrbitSpeed;
@@ -275,7 +335,10 @@ function animate() {
       camera.position.lerp(zoomTarget, zoomSpeed);
       controls.target.lerp(objectPosition, 0.1);
     }
-    if (camera.position.distanceTo(zoomTarget) < 1) {
+    if (
+      camera.position.distanceTo(zoomTarget) <
+      1.6 ** targetObject.geometry.boundingSphere.radius
+    ) {
       isZooming = false;
     }
     controls.update();
@@ -289,6 +352,9 @@ function animate() {
   if (targetObject) {
     controls.target.lerp(targetObject.position, 0.1);
   }
+
+  // SUN EMISSIVITY
+  emissiveUpdate();
 
   composer.render();
 }

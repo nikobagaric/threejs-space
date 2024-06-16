@@ -63,6 +63,7 @@ a {
 
 /* end of reset */
 
+
 header {
   display: flex;
   position: sticky;
@@ -103,13 +104,14 @@ h1 {
 }
 
 #loadingScreen {
-  position: fixed;
+  position: absolute;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
   background: black;
   display: flex;
+  flex-direction: column;
   justify-content: center;
   align-items: center;
   z-index: 100;
@@ -117,6 +119,6 @@ h1 {
 
 #loader {
   width: 0%;
-  height: 20px;
-  background: red;
+  height: 10px;
+  background: rgb(255, 255, 255);
 }
