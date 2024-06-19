@@ -53,9 +53,16 @@ manager.onStart = function (url, itemsLoaded, itemsTotal) {
   );
 };
 
+function checkObjectsAndCalculateDistance() {
+  if (sun && earth) {
+    earthToSunDistance = sun.position.distanceTo(earth.position);
+    console.log("Distance between Earth and Sun: ", earthToSunDistance);
+  }
+}
 manager.onLoad = function () {
   console.log("Loading complete!");
   document.getElementById("loadingScreen").style.display = "none"; // Hide loading screen when loading complete
+  checkObjectsAndCalculateDistance();
 };
 
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
@@ -78,12 +85,12 @@ manager.onError = function (url) {
 
 // ** LIGHTING ** \\
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.25);
+const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
 scene.add(ambientLight);
 
-const hemisphereLight = new THREE.HemisphereLight(0x8812ff, 0x881288, 4);
-hemisphereLight.position.set(0, 10, 0);
-scene.add(hemisphereLight);
+// const hemisphereLight = new THREE.HemisphereLight(0x8812ff, 0x881288, 4);
+// hemisphereLight.position.set(0, 10, 0);
+// scene.add(hemisphereLight);
 
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Softer shadows
@@ -95,6 +102,13 @@ const textureLoader = new THREE.TextureLoader(manager);
 let earth = null;
 let earthClouds = null;
 
+let earthToSunDistance = 7;
+const earthOrbitSpeed = 0.00005;
+let earthOrbitAngle = 0;
+
+const earthOrbit = new THREE.CircleGeometry(earthToSunDistance);
+scene.add(earthOrbit);
+
 loader.load(
   "/models/earth/scene.gltf",
   function (gltf) {
@@ -102,7 +116,9 @@ loader.load(
     earth.traverse(function (object) {
       if (object.name.includes("9")) earthClouds = object;
     });
+    earth.position.set(30, 0, 0);
     scene.add(earth);
+    checkObjectsAndCalculateDistance(); // Check and calculate when earth is added.
   },
   function (xhr) {
     console.log((xhr.loaded / xhr.total) * 100 + "% loaded");
@@ -113,6 +129,7 @@ loader.load(
 );
 
 // moon
+
 const moonOrbitRadius = 6;
 const moonOrbitSpeed = moonOrbitRadius * 10e-5;
 let moonOrbitAngle = 0;
@@ -123,7 +140,7 @@ const moon = new THREE.Mesh(
   new THREE.SphereGeometry(0.2),
   new THREE.MeshPhongMaterial({
     map: moonTexture,
-    shininess: 0.5,
+    shininess: 0.1,
   })
 );
 moon.name = "Moon";
@@ -132,12 +149,11 @@ moon.position.set(moonOrbitRadius, 0, 0);
 scene.add(moon);
 
 // sun
-const sunPosition = new THREE.Vector3(moonOrbitRadius * 11, 0, 0);
-
 function emissiveUpdate() {
-  const distance = camera.position.distanceTo(sunPosition);
+  const distance = camera.position.distanceTo(sun.position);
   const maxDistance = moonOrbitRadius * 11;
-  let intensityFactor = distance / maxDistance + 0.4;
+  let intensityFactor = distance / maxDistance + 0.3;
+  intensityFactor = Math.pow(intensityFactor, 2);
   intensityFactor = Math.min(1, intensityFactor);
   sunMaterial.emissiveIntensity = intensityFactor;
 }
@@ -145,17 +161,54 @@ function emissiveUpdate() {
 const sunTexture = textureLoader.load("/img/SunTexture.jpg");
 let sunMaterial = new THREE.MeshPhongMaterial({
   map: sunTexture,
-  emissive: 0xffff55,
-  emissiveIntensity: 0.8,
-  shininess: 0.6,
+  emissive: 0xffffff,
+  emissiveIntensity: 1,
+  shininess: 1,
+  lightMap: sunTexture,
 });
 
+const lightStrength = 0.8;
+
+const sunLight1 = new THREE.PointLight(0xffffff, lightStrength, 100000, 0);
+const sunLight2 = new THREE.PointLight(0xffffff, lightStrength, 100000, 0);
+const sunLight3 = new THREE.PointLight(0xffffff, lightStrength, 100000, 0);
+const sunLight4 = new THREE.PointLight(0xffffff, lightStrength, 100000, 0);
+const sunLight5 = new THREE.PointLight(0xffffff, lightStrength, 100000, 0);
+const sunLight6 = new THREE.PointLight(0xffffff, lightStrength, 100000, 0);
 const sun = new THREE.Mesh(new THREE.SphereGeometry(2), sunMaterial);
 sun.name = "Sun";
-sun.position.set(moonOrbitRadius * 11, 0, 0);
+sun.position.set(0, 0, 0);
 sun.castShadow = true;
 
-scene.add(sun);
+sunLight1.position.set(5, 0, 0);
+sunLight2.position.set(-5, 0, 0);
+sunLight3.position.set(0, 5, 0);
+sunLight4.position.set(0, -5, 0);
+sunLight5.position.set(0, 0, 5);
+sunLight6.position.set(0, 0, -5);
+
+// the rest of the planets
+
+
+scene.add(
+  sun,
+  sunLight1,
+  sunLight2,
+  sunLight3,
+  sunLight4,
+  sunLight5,
+  sunLight6
+);
+
+const mercuryTexture = textureLoader.load("/img/mercury.jpg");
+const mercury = new THREE.Mesh(
+  new THREE.SphereGeometry(0.25),
+  new THREE.MeshPhongMaterial({
+    map:mercuryTexture,
+  })
+);
+mercury.position.set(7,0,0);
+scene.add(mercury);
 
 // stars
 function createStars(count, size) {
@@ -232,7 +285,11 @@ function switchCardText(currentPlanet) {
   }
 }
 
-let earthCoords = {latitude: 0, longitude: 0};
+let earthCoords = { latitude: 0, longitude: 0 };
+
+// VARIABLES
+
+// EVENT
 
 window.addEventListener(
   "click",
@@ -242,32 +299,43 @@ window.addEventListener(
 
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(
-      [earth, moon, sun].filter(obj => obj !== null),
+      [earth, moon, sun, mercury].filter((obj) => obj !== null),
       true
     );
 
     if (intersects.length > 0 && targetObject != intersects[0].object) {
       let intersectionPoint = intersects[0].point;
-      let direction = intersectionPoint.clone().sub(camera.position).normalize();
+      let direction = intersectionPoint
+        .clone()
+        .sub(camera.position)
+        .normalize();
       targetObject = intersects[0].object;
 
       let radius = targetObject.geometry.boundingSphere.radius;
-      targetZoomPosition = intersectionPoint.sub(direction.multiplyScalar(radius + 1)); // Move back by radius + 1 unit from the intersection point
+      targetZoomPosition = intersectionPoint.sub(
+        direction.multiplyScalar(radius + 1)
+      ); // Move back by radius + 1 unit from the intersection point
 
       isZooming = true;
       switchCardText(targetObject);
       heroCard.classList.add("active-card");
 
-      if (targetObject.name === "Object_9") {
+      // Specific handling for Earth and Moon based on their geometry
+      if (targetObject) {
+        let radius = targetObject.geometry.boundingSphere.radius;
+        targetZoomPosition = intersectionPoint.add(
+          direction.multiplyScalar(radius + 1)
+        ); // Adjust slightly out from the surface
         let normalizedY = intersectionPoint.y / radius;
         normalizedY = Math.max(-1, Math.min(1, normalizedY)); // Ensure it stays within [-1, 1]
 
-        let latitude = 90 - (Math.acos(normalizedY) * 180 / Math.PI);  // φ
-        let longitude = (Math.atan2(intersectionPoint.z, intersectionPoint.x) * 180 / Math.PI); // λ
+        let latitude = 90 - (Math.acos(normalizedY) * 180) / Math.PI; // φ
+        let longitude =
+          (Math.atan2(intersectionPoint.z, intersectionPoint.x) * 180) /
+          Math.PI; // λ
         console.log("Latitude:", latitude, "Longitude:", longitude);
       }
       console.log("Intersection Point:", intersectionPoint);
-
     } else if (intersects.length == 0 && targetObject != null) {
       targetObject = null;
       isZooming = false;
@@ -277,16 +345,15 @@ window.addEventListener(
   false
 );
 
-
 // fx
 const composer = new EffectComposer(renderer);
 composer.addPass(new RenderPass(scene, camera));
 
 const bloomPass = new UnrealBloomPass(
   new THREE.Vector2(window.innerWidth, window.innerHeight),
-  1.25,
-  1,
-  0.76
+  0.235,
+  0.2,
+  0.2
 );
 composer.addPass(bloomPass);
 
@@ -321,8 +388,17 @@ function animate() {
 
   // MOON ORBIT
   moonOrbitAngle += moonOrbitSpeed;
-  moon.position.x = moonOrbitRadius * Math.cos(moonOrbitAngle);
-  moon.position.z = moonOrbitRadius * Math.sin(moonOrbitAngle);
+  moon.position.x =
+    earth.position.x + moonOrbitRadius * Math.cos(moonOrbitAngle);
+  moon.position.z =
+    earth.position.z + moonOrbitRadius * Math.sin(moonOrbitAngle);
+
+  // PLANET ORBIT
+  earthOrbitAngle += earthOrbitSpeed;
+  earth.position.x =
+    earthToSunDistance * Math.cos(earthOrbitAngle) + sun.position.x;
+  earth.position.z =
+    earthToSunDistance * Math.sin(earthOrbitAngle) + sun.position.z;
 
   // ZOOMS
   if (isZooming) {
@@ -347,10 +423,6 @@ function animate() {
     targetObject.getWorldPosition(objectPosition);
     controls.target.lerp(objectPosition, 0.1);
     controls.update();
-  }
-
-  if (targetObject) {
-    controls.target.lerp(targetObject.position, 0.1);
   }
 
   // SUN EMISSIVITY
