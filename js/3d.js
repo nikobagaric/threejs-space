@@ -63,6 +63,7 @@ manager.onLoad = function () {
   console.log("Loading complete!");
   document.getElementById("loadingScreen").style.display = "none"; // Hide loading screen when loading complete
   checkObjectsAndCalculateDistance();
+  planetMeshes.push(earth, sun, moon);
 };
 
 manager.onProgress = function (url, itemsLoaded, itemsTotal) {
@@ -106,9 +107,6 @@ let earthToSunDistance = 7;
 const earthOrbitSpeed = 0.00005;
 let earthOrbitAngle = 0;
 
-const earthOrbit = new THREE.CircleGeometry(earthToSunDistance);
-scene.add(earthOrbit);
-
 loader.load(
   "/models/earth/scene.gltf",
   function (gltf) {
@@ -116,7 +114,7 @@ loader.load(
     earth.traverse(function (object) {
       if (object.name.includes("9")) earthClouds = object;
     });
-    earth.position.set(30, 0, 0);
+    earth.position.set(35, 0, 0);
     scene.add(earth);
     checkObjectsAndCalculateDistance(); // Check and calculate when earth is added.
   },
@@ -187,9 +185,6 @@ sunLight4.position.set(0, -5, 0);
 sunLight5.position.set(0, 0, 5);
 sunLight6.position.set(0, 0, -5);
 
-// the rest of the planets
-
-
 scene.add(
   sun,
   sunLight1,
@@ -200,15 +195,119 @@ scene.add(
   sunLight6
 );
 
-const mercuryTexture = textureLoader.load("/img/mercury.jpg");
-const mercury = new THREE.Mesh(
-  new THREE.SphereGeometry(0.25),
-  new THREE.MeshPhongMaterial({
-    map:mercuryTexture,
-  })
-);
-mercury.position.set(7,0,0);
-scene.add(mercury);
+// the rest of the planets
+
+let planetMeshes = [];
+const planets = [
+  {
+    name: "Mercury",
+    texture: "/img/mercury.jpg",
+    size: 0.25,
+    distance: 7,
+    speed: -1.2 * 10e-4,
+    rotationSpeed: 0.00612216,
+  },
+  {
+    name: "Venus",
+    texture: "/img/venus.jpg",
+    size: 0.87,
+    distance: 18,
+    speed: 4 * 10e-6,
+    rotationSpeed: 0.0016,
+  },
+  {
+    name: "Mars",
+    texture: "/img/mars.jpg",
+    size: 0.47,
+    distance: 28,
+    speed: 6 * 10e-5,
+    rotationSpeed: 0.0026,
+  },
+  {
+    name: "Jupiter",
+    texture: "/img/jupiter.jpg",
+    size: 1.2,
+    distance: 55,
+    speed: -11 * 10e-6,
+    rotationSpeed: 3 * 10e-3,
+  },
+  {
+    name: "Saturn",
+    texture: "/img/saturn.jpg",
+    size: 1.1,
+    distance: 85,
+    speed: 2 * 10e-6,
+    rotationSpeed: 0.0002,
+  },
+  {
+    name: "Uranus",
+    texture: "/img/uranus.jpg",
+    size: 0.9,
+    distance: 126,
+    speed: 10e-6,
+    rotationSpeed: 0.006,
+  },
+  {
+    name: "Neptune",
+    texture: "/img/neptune.jpg",
+    size: 0.8,
+    distance: 157,
+    speed: -1.3 * 10e-5,
+    rotationSpeed: 0.00098,
+  },
+];
+
+planets.forEach((planet) => {
+  const planetTexture = textureLoader.load(planet.texture);
+  const planetMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(planet.size),
+    new THREE.MeshPhongMaterial({ map: planetTexture })
+  );
+  planetMesh.name = planet.name;
+  planetMesh.position.set(planet.distance, 0, 0);
+
+  planetMeshes.push(planetMesh);
+  scene.add(planetMesh);
+
+  // Set orbital parameters
+  const planetOrbitRadius = planetMesh.position.distanceTo(sun.position);
+  const planetOrbitSpeed = planet.speed;
+  let planetOrbitAngle = 0;
+
+  // Attach orbital parameters to the planet's mesh object
+  planetMesh.userData = {
+    orbitRadius: planetOrbitRadius,
+    orbitSpeed: planetOrbitSpeed,
+    orbitAngle: planetOrbitAngle,
+    rotationSpeed: planet.rotationSpeed,
+  };
+});
+
+// Function to update planets' positions in the animation loop
+function updatePlanets() {
+  planets.forEach((planet, index) => {
+    const planetMesh = scene.children.find((obj) => obj.name === planet.name);
+    if (planetMesh) {
+      // Update orbit angle
+      planetMesh.userData.orbitAngle += planetMesh.userData.orbitSpeed;
+
+      // new position
+      planetMesh.position.x =
+        sun.position.x +
+        planetMesh.userData.orbitRadius *
+          Math.cos(planetMesh.userData.orbitAngle);
+      planetMesh.position.z =
+        sun.position.z +
+        planetMesh.userData.orbitRadius *
+          Math.sin(planetMesh.userData.orbitAngle);
+
+      planetMesh.rotateOnAxis(
+        new THREE.Vector3(0, 1, 0),
+        planetMesh.userData.rotationSpeed
+      );
+    }
+  });
+}
 
 // stars
 function createStars(count, size) {
@@ -299,7 +398,7 @@ window.addEventListener(
 
     raycaster.setFromCamera(mouse, camera);
     const intersects = raycaster.intersectObjects(
-      [earth, moon, sun, mercury].filter((obj) => obj !== null),
+      planetMeshes.filter((obj) => obj !== null),
       true
     );
 
@@ -375,9 +474,23 @@ function animate() {
   controls.update();
 
   // ROTATIONS
-  if (earthClouds) {
+  if (earth) {
     earthClouds.rotateOnAxis(new THREE.Vector3(0, 1), 0.001);
     earth.rotateOnAxis(new THREE.Vector3(0, -1), 0.0005);
+
+    // EARTH ORBIT
+    earthOrbitAngle += earthOrbitSpeed;
+    earth.position.x =
+      earthToSunDistance * Math.cos(earthOrbitAngle) + sun.position.x;
+    earth.position.z =
+      earthToSunDistance * Math.sin(earthOrbitAngle) + sun.position.z;
+
+    // MOON ORBIT
+    moonOrbitAngle += moonOrbitSpeed;
+    moon.position.x =
+      earth.position.x + moonOrbitRadius * Math.cos(moonOrbitAngle);
+    moon.position.z =
+      earth.position.z + moonOrbitRadius * Math.sin(moonOrbitAngle);
   }
   if (moon) {
     moon.rotateOnAxis(new THREE.Vector3(0.7, 0.25, -1), 0.0026);
@@ -386,19 +499,8 @@ function animate() {
     sun.rotateOnAxis(new THREE.Vector3(0, 1, 0), 0.005);
   }
 
-  // MOON ORBIT
-  moonOrbitAngle += moonOrbitSpeed;
-  moon.position.x =
-    earth.position.x + moonOrbitRadius * Math.cos(moonOrbitAngle);
-  moon.position.z =
-    earth.position.z + moonOrbitRadius * Math.sin(moonOrbitAngle);
-
   // PLANET ORBIT
-  earthOrbitAngle += earthOrbitSpeed;
-  earth.position.x =
-    earthToSunDistance * Math.cos(earthOrbitAngle) + sun.position.x;
-  earth.position.z =
-    earthToSunDistance * Math.sin(earthOrbitAngle) + sun.position.z;
+  updatePlanets();
 
   // ZOOMS
   if (isZooming) {
